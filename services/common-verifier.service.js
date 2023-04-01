@@ -1,158 +1,157 @@
-import { callInfuraApi } from '@root/helpers/axios.helper'
-import { decodeEventLogData } from '@root/helpers/handle-data.helper'
+import { callInfuraApi } from "@root/helpers/axios.helper";
+import { decodeEventLogData } from "@root/helpers/handle-data.helper";
 import {
   isTransactionOnDex,
   isSpecifyTransaction,
-} from '@root/helpers/common.helper'
+} from "@root/helpers/common.helper";
 import {
+  CURRENCY_INFO,
   EVENT_TOPIC,
-  CURRENCY_ADDRESS,
   CURRENCY_DECIMAL,
-  CURRENCY_CODE,
-} from '@root/helpers/constants'
-import { ethers } from 'ethers'
+} from "@root/helpers/constants";
+import { ethers } from "ethers";
 
 export const isSatisfiedTransactionOnDex = async (
   chain,
   txHash,
   dexAddresses,
-  topics,
+  topics
 ) => {
   const txReceipt = await callInfuraApi(
     chain,
-    'eth_getTransactionReceipt',
-    txHash,
-  )
+    "eth_getTransactionReceipt",
+    txHash
+  );
   if (!isTransactionOnDex(txReceipt, dexAddresses)) {
-    console.log('Transaction is not on dex')
-    return false
+    console.log("Transaction is not on dex");
+    return false;
   }
   if (!isSpecifyTransaction(txReceipt, topics)) {
-    console.log('Transaction is not satisfied')
-    return false
+    console.log("Transaction is not satisfied");
+    return false;
   }
-  return true
-}
+  return true;
+};
 
 export const getTransactionFromUserByCondition = async (
   chain,
   walletAddress,
-  fromCurrencyCode,
+  fromCurrencyAddress,
   amount,
-  startBlock = 'earliest',
-  endBlock = 'latest',
+  startBlock = "earliest",
+  endBlock = "latest"
 ) => {
   let topicSets = [
     EVENT_TOPIC.TRANSFER_ERC20,
     ethers.utils.hexZeroPad(walletAddress, 32),
-  ]
+  ];
   const filter = {
-    address: CURRENCY_ADDRESS[chain][fromCurrencyCode],
+    address: fromCurrencyAddress,
     topics: topicSets,
     fromBlock: startBlock,
     toBlock: endBlock,
-  }
-  const logs = await callInfuraApi(chain, 'eth_getLogs', filter)
-  if (!amount) return logs
+  };
+  const logs = await callInfuraApi(chain, "eth_getLogs", filter);
+  if (!amount) return logs;
   return logs.filter((log) =>
     ethers.utils
-      .parseUnits(String(amount), CURRENCY_DECIMAL[fromCurrencyCode])
-      .eq(decodeEventLogData(fromCurrencyCode, log.data)),
-  )
-}
+      .parseUnits(String(amount), CURRENCY_DECIMAL[chain][fromCurrencyAddress])
+      .eq(decodeEventLogData(fromCurrencyAddress, log.data))
+  );
+};
 
 export const getTransactionToUserByCondition = async (
   chain,
   walletAddress,
-  toCurrencyCode,
+  toCurrencyAddress,
   startBlock,
-  endBlock,
+  endBlock
 ) => {
   let topicSets = [
     EVENT_TOPIC.TRANSFER_ERC20,
     null,
     ethers.utils.hexZeroPad(walletAddress, 32),
-  ]
+  ];
 
   const filter = {
-    address: CURRENCY_ADDRESS[chain][toCurrencyCode],
+    address: toCurrencyAddress,
     topics: topicSets,
     fromBlock: startBlock,
     toBlock: endBlock,
-  }
-  return callInfuraApi(chain, 'eth_getLogs', filter)
-}
+  };
+  return callInfuraApi(chain, "eth_getLogs", filter);
+};
 
 export const verifySwapTransactionOnDex = async (
   chain,
   walletAddress,
-  fromCurrencyCode,
-  toCurrencyCode,
+  fromCurrencyAddr,
+  toCurrencyAddr,
   amount,
   dexAddresses,
-  swapTopics,
+  swapTopics
 ) => {
-  const time = Date.now()
+  const time = Date.now();
   // Get event transfer from user
   const eventTransferFromUser = await getTransactionFromUserByCondition(
     chain,
     walletAddress,
-    fromCurrencyCode,
-    amount,
-  )
-  if (!eventTransferFromUser || eventTransferFromUser.length === 0) {
-    return false
+    fromCurrencyAddr,
+    amount
+  );
+  if (eventTransferFromUser?.length === 0) {
+    return false;
   }
-  console.log('Event transfer from user: ', eventTransferFromUser)
+  console.log("Event transfer from user: ", eventTransferFromUser);
 
   // Get event transfer to user
-  const startBlock = eventTransferFromUser[0].blockNumber
+  const startBlock = eventTransferFromUser[0].blockNumber;
   const endBlock =
-    eventTransferFromUser[eventTransferFromUser.length - 1].blockNumber
+    eventTransferFromUser[eventTransferFromUser.length - 1].blockNumber;
   const eventTransferToUser = await getTransactionToUserByCondition(
     chain,
     walletAddress,
-    toCurrencyCode,
+    toCurrencyAddr,
     startBlock,
-    endBlock,
-  )
-  if (!eventTransferToUser || eventTransferToUser.length === 0) {
-    return false
+    endBlock
+  );
+  if (eventTransferToUser?.length === 0) {
+    return false;
   }
-  console.log('Event transfer to user: ', eventTransferToUser)
+  console.log("Event transfer to user: ", eventTransferToUser);
 
   // Get transaction hashes
   const fromTransactionHashes = eventTransferFromUser.map(
-    (log) => log.transactionHash,
-  )
+    (log) => log.transactionHash
+  );
   const toTransactionHashes = eventTransferToUser.map(
-    (log) => log.transactionHash,
-  )
-  console.log(fromTransactionHashes)
-  console.log(toTransactionHashes)
-  const txHashes = toTransactionHashes.filter((hash) =>
-    fromTransactionHashes.includes(hash),
-  )
-  console.log(txHashes)
+    (log) => log.transactionHash
+  );
+  console.log(fromTransactionHashes);
+  console.log(toTransactionHashes);
+  const matchTxHashes = toTransactionHashes.filter((hash) =>
+    fromTransactionHashes.includes(hash)
+  );
+  console.log(matchTxHashes);
 
   // Verify swap transaction
   // eslint-disable-next-line no-restricted-syntax
-  for (const txHash of txHashes) {
+  for (const txHash of matchTxHashes) {
     // eslint-disable-next-line no-await-in-loop
     const verified = await isSatisfiedTransactionOnDex(
       chain,
       txHash,
       dexAddresses,
-      swapTopics,
-    )
+      swapTopics
+    );
     if (verified) {
-      console.log('All time: ', Date.now() - time)
-      return true
+      console.log("All time: ", Date.now() - time);
+      return true;
     }
   }
-  console.log('All time: ', Date.now() - time)
-  return false
-}
+  console.log("All time: ", Date.now() - time);
+  return false;
+};
 
 export const verifyAddLiquidityTransactionOnDex = async (
   chain,
@@ -161,81 +160,68 @@ export const verifyAddLiquidityTransactionOnDex = async (
   secondCurrency,
   amount,
   dexAddresses,
-  addLiquidityTopics,
+  addLiquidityTopics
 ) => {
-  const time = Date.now()
+  const time = Date.now();
   // Get event transfer first currency from user
-  const eventTransferFirstCurrencyFromUser = await getTransactionFromUserByCondition(
+  const eventTransferFirstCurrency = await getTransactionFromUserByCondition(
     chain,
     walletAddress,
     firstCurrency,
-    amount,
-  )
-  if (
-    !eventTransferFirstCurrencyFromUser ||
-    eventTransferFirstCurrencyFromUser.length === 0
-  ) {
-    return false
+    amount
+  );
+  if (eventTransferFirstCurrency?.length === 0) {
+    return false;
   }
-  console.log(
-    'Event transfer first currency from user: ',
-    eventTransferFirstCurrencyFromUser,
-  )
+  console.log("Event transfer first currency: ", eventTransferFirstCurrency);
 
   // Get event transfer second currency from user
-  const startBlock = eventTransferFirstCurrencyFromUser[0].blockNumber
+  const startBlock = eventTransferFirstCurrency[0].blockNumber;
   const endBlock =
-    eventTransferFirstCurrencyFromUser[
-      eventTransferFirstCurrencyFromUser.length - 1
-    ].blockNumber
-  const eventTransferSecondCurrencyFromUser = await getTransactionFromUserByCondition(
+    eventTransferFirstCurrency[eventTransferFirstCurrency.length - 1]
+      .blockNumber;
+  const eventTransferSecondCurrency = await getTransactionFromUserByCondition(
     chain,
     walletAddress,
     secondCurrency,
     null,
     startBlock,
-    endBlock,
-  )
-  if (
-    !eventTransferSecondCurrencyFromUser ||
-    eventTransferSecondCurrencyFromUser.length === 0
-  ) {
-    return false
+    endBlock
+  );
+  if (eventTransferSecondCurrency?.length === 0) {
+    return false;
   }
-  console.log(
-    'Event transfer second currency from user: ',
-    eventTransferSecondCurrencyFromUser,
-  )
+  console.log("Event transfer second currency: ", eventTransferSecondCurrency);
 
   // Get transaction hashes
-  const firstCurrencyTransactionHashes = eventTransferFirstCurrencyFromUser.map(
-    (log) => log.transactionHash,
-  )
-  const secondCurrencyTransactionHashes = eventTransferSecondCurrencyFromUser.map(
-    (log) => log.transactionHash,
-  )
-  console.log(firstCurrencyTransactionHashes)
-  console.log(secondCurrencyTransactionHashes)
-  const txHashes = secondCurrencyTransactionHashes.filter((hash) =>
-    firstCurrencyTransactionHashes.includes(hash),
-  )
-  console.log(txHashes)
+  const firstCurrencyTxHashes = eventTransferFirstCurrency.map(
+    (log) => log.transactionHash
+  );
+  const secondCurrencyTxHashes = eventTransferSecondCurrency.map(
+    (log) => log.transactionHash
+  );
+  console.log(firstCurrencyTxHashes);
+  console.log(secondCurrencyTxHashes);
+  const matchTxHashes = secondCurrencyTxHashes.filter((hash) =>
+    firstCurrencyTxHashes.includes(hash)
+  );
+  console.log(matchTxHashes);
 
   // Verify swap transaction
   // eslint-disable-next-line no-restricted-syntax
-  for (const txHash of txHashes) {
+  for (const txHash of matchTxHashes) {
     // eslint-disable-next-line no-await-in-loop
     const verified = await isSatisfiedTransactionOnDex(
       chain,
       txHash,
       dexAddresses,
-      addLiquidityTopics,
-    )
+      addLiquidityTopics
+    );
     if (verified) {
-      console.log('All time: ', Date.now() - time)
-      return true
+      console.log("All time: ", Date.now() - time);
+      return true;
     }
   }
-  console.log('All time: ', Date.now() - time)
-  return false
-}
+  console.log("All time: ", Date.now() - time);
+  return false;
+};
