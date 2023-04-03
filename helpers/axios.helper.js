@@ -10,8 +10,9 @@ export const callInfuraApi = async (chain, method, filter) => {
   }
   const endpoint = RPC_URL[chain]
   const response = await axios.post(endpoint, params)
-  if (!response || !response.data) {
-    throw new Error('Request to Infura RPC failed')
+  if (!response?.data?.result) {
+    throw new Error(`Request to Infura RPC failed: ${JSON.stringify(response?.data?.error)}`)
   }
+  console.log(response.data)
   return response.data.result
 }

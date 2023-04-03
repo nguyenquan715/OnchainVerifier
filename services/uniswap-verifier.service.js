@@ -1,8 +1,5 @@
-import { DEX_ADDRESS, EVENT_TOPIC, DEX_NAME } from "@root/helpers/constants";
-import {
-  verifySwapTransactionOnDex,
-  verifyAddLiquidityTransactionOnDex,
-} from "@root/services/common-verifier.service";
+import { DEX_ADDRESS, EVENT_TOPIC, DEX_NAME } from '@root/helpers/constants'
+import { verifySwapTransactionOnDex, verifyAddLiquidityTransactionOnDex } from '@root/services/common-verifier.service'
 
 export const verifySwapTransactionOnUniswap = async (
   chain,
@@ -11,11 +8,8 @@ export const verifySwapTransactionOnUniswap = async (
   toCurrencyCode,
   amount
 ) => {
-  const uniswapDexAddresses = [DEX_ADDRESS[chain].UNISWAP_UNIVERSAL_ROUTER];
-  const swapTopics = [
-    EVENT_TOPIC[DEX_NAME.UNI_SWAP].SWAP_V2,
-    EVENT_TOPIC[DEX_NAME.UNI_SWAP].SWAP_V3,
-  ];
+  const uniswapDexAddresses = [DEX_ADDRESS[chain].UNISWAP_UNIVERSAL_ROUTER]
+  const swapTopics = [EVENT_TOPIC[DEX_NAME.UNI_SWAP].SWAP_V2, EVENT_TOPIC[DEX_NAME.UNI_SWAP].SWAP_V3]
   return verifySwapTransactionOnDex(
     chain,
     walletAddress,
@@ -24,8 +18,8 @@ export const verifySwapTransactionOnUniswap = async (
     amount,
     uniswapDexAddresses,
     swapTopics
-  );
-};
+  )
+}
 
 export const verifyAddLiquidityTransactionOnUniswap = async (
   chain,
@@ -34,12 +28,8 @@ export const verifyAddLiquidityTransactionOnUniswap = async (
   secondCurrencyCode,
   amount
 ) => {
-  const uniswapDexAddresses = [
-    DEX_ADDRESS[chain].UNISWAP_V3_NFT_POSITION_MANAGER,
-  ];
-  const addLiquidityTopics = [
-    EVENT_TOPIC[DEX_NAME.UNI_SWAP].INCREASE_LIQUIDITY_V3,
-  ];
+  const uniswapDexAddresses = [DEX_ADDRESS[chain].UNISWAP_V3_NFT_POSITION_MANAGER]
+  const addLiquidityTopics = [EVENT_TOPIC[DEX_NAME.UNI_SWAP].INCREASE_LIQUIDITY_V3]
   return verifyAddLiquidityTransactionOnDex(
     chain,
     walletAddress,
@@ -48,5 +38,5 @@ export const verifyAddLiquidityTransactionOnUniswap = async (
     amount,
     uniswapDexAddresses,
     addLiquidityTopics
-  );
-};
+  )
+}
