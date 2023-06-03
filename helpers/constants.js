@@ -15,11 +15,17 @@ export const INFURA_METHOD = Object.freeze({
   GET_LOGS: 'eth_getLogs',
   GET_TX_RECEIPT: 'eth_getTransactionReceipt',
   GET_BALANCE: 'eth_getBalance',
+  GET_BLOCK_NUMBER: 'eth_blockNumber',
 })
 
 export const RPC_URL = Object.freeze({
   [CHAIN.POLYGON]: process.env.POLYGON_RPC_URL,
   [CHAIN.ETHEREUM]: process.env.ETHEREUM_RPC_URL,
+})
+
+export const CONFIRMATION_BLOCK = Object.freeze({
+  [CHAIN.POLYGON]: 500,
+  [CHAIN.ETHEREUM]: 15,
 })
 
 export const EVENT_TOPIC = Object.freeze({

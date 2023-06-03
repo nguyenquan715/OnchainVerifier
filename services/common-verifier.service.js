@@ -1,18 +1,19 @@
 import { callInfuraApi } from '@root/helpers/axios.helper'
 import { decodeEventLogData } from '@root/helpers/handle-data.helper'
-import { isTransactionOnDex, isSpecifyTransaction } from '@root/helpers/common.helper'
+import { isTransactionOnDex, isSpecifyTransaction, isConfirmedTransaction } from '@root/helpers/common.helper'
 import { EVENT_TOPIC, CURRENCY_DECIMAL, INFURA_METHOD, CURRENCY_INFO } from '@root/helpers/constants'
 import { ethers } from 'ethers'
 
-const isSatisfiedTransactionOnDex = async (chain, txHash, dexAddresses, topics) => {
+const isSatisfiedTransactionOnDex = async (chain, txHash, dexAddresses, topics, latestBlockNumber) => {
   const txReceipt = await callInfuraApi(chain, INFURA_METHOD.GET_TX_RECEIPT, txHash)
   if (!isTransactionOnDex(txReceipt, dexAddresses)) {
-    console.log('Transaction is not on dex')
-    return false
+    return Promise.reject('Transaction is not on dex')
   }
   if (!isSpecifyTransaction(txReceipt, topics)) {
-    console.log('Transaction is not satisfied')
-    return false
+    return Promise.reject('Transaction is not satisfied')
+  }
+  if (!isConfirmedTransaction(chain, txReceipt, latestBlockNumber)) {
+    return Promise.reject('Transaction is not confirmed')
   }
   return true
 }
@@ -94,10 +95,9 @@ export const verifySwapTransactionOnDex = async (
   dexAddresses,
   swapTopics
 ) => {
-  const time = Date.now()
   // Get event transfer from user
   const eventTransferFromUser = await getTransactionFromUserByCondition(chain, walletAddress, fromCurrencyAddr, amount)
-  if (eventTransferFromUser?.length === 0) {
+  if (!eventTransferFromUser?.length) {
     return false
   }
   console.log('Event transfer from user: ', eventTransferFromUser)
@@ -105,6 +105,7 @@ export const verifySwapTransactionOnDex = async (
   // Get event transfer to user
   const startBlock = eventTransferFromUser[0].blockNumber
   const endBlock = eventTransferFromUser[eventTransferFromUser.length - 1].blockNumber
+  console.log(Number(startBlock), Number(endBlock))
   const eventTransferToUser = await getTransactionToUserByCondition(
     chain,
     walletAddress,
@@ -112,7 +113,7 @@ export const verifySwapTransactionOnDex = async (
     startBlock,
     endBlock
   )
-  if (eventTransferToUser?.length === 0) {
+  if (!eventTransferToUser?.length) {
     return false
   }
   console.log('Event transfer to user: ', eventTransferToUser)
@@ -120,23 +121,23 @@ export const verifySwapTransactionOnDex = async (
   // Get transaction hashes
   const fromTransactionHashes = eventTransferFromUser.map((log) => log.transactionHash)
   const toTransactionHashes = eventTransferToUser.map((log) => log.transactionHash)
-  console.log(fromTransactionHashes)
-  console.log(toTransactionHashes)
   const matchTxHashes = toTransactionHashes.filter((hash) => fromTransactionHashes.includes(hash))
+  if (!matchTxHashes.length) {
+    return false
+  }
   console.log(matchTxHashes)
 
   // Verify swap transaction
-  // eslint-disable-next-line no-restricted-syntax
-  for (const txHash of matchTxHashes) {
-    // eslint-disable-next-line no-await-in-loop
-    const verified = await isSatisfiedTransactionOnDex(chain, txHash, dexAddresses, swapTopics)
-    if (verified) {
-      console.log('All time: ', Date.now() - time)
-      return true
-    }
+  try {
+    const latestBlockNumber = Number(await callInfuraApi(chain, INFURA_METHOD.GET_BLOCK_NUMBER))
+    console.log(latestBlockNumber)
+    await Promise.any(matchTxHashes.map((txHash) => isSatisfiedTransactionOnDex(chain, txHash, dexAddresses, swapTopics, latestBlockNumber)))
+    return true
+  } catch (err) {
+    console.log('Error: ', err.message)
+    console.log(err.errors)
+    return false
   }
-  console.log('All time: ', Date.now() - time)
-  return false
 }
 
 export const verifyAddLiquidityTransactionOnDex = async (
@@ -148,7 +149,6 @@ export const verifyAddLiquidityTransactionOnDex = async (
   dexAddresses,
   addLiquidityTopics
 ) => {
-  const time = Date.now()
   // Get event transfer first currency from user
   const eventTransferFirstCurrency = await getTransactionFromUserByCondition(
     chain,
@@ -156,7 +156,7 @@ export const verifyAddLiquidityTransactionOnDex = async (
     firstCurrency,
     amount
   )
-  if (eventTransferFirstCurrency?.length === 0) {
+  if (!eventTransferFirstCurrency?.length) {
     return false
   }
   console.log('Event transfer first currency: ', eventTransferFirstCurrency)
@@ -172,7 +172,7 @@ export const verifyAddLiquidityTransactionOnDex = async (
     startBlock,
     endBlock
   )
-  if (eventTransferSecondCurrency?.length === 0) {
+  if (!eventTransferSecondCurrency?.length) {
     return false
   }
   console.log('Event transfer second currency: ', eventTransferSecondCurrency)
@@ -180,21 +180,21 @@ export const verifyAddLiquidityTransactionOnDex = async (
   // Get transaction hashes
   const firstCurrencyTxHashes = eventTransferFirstCurrency.map((log) => log.transactionHash)
   const secondCurrencyTxHashes = eventTransferSecondCurrency.map((log) => log.transactionHash)
-  console.log(firstCurrencyTxHashes)
-  console.log(secondCurrencyTxHashes)
   const matchTxHashes = secondCurrencyTxHashes.filter((hash) => firstCurrencyTxHashes.includes(hash))
+  if (!matchTxHashes.length) {
+    return false
+  }
   console.log(matchTxHashes)
 
-  // Verify swap transaction
-  // eslint-disable-next-line no-restricted-syntax
-  for (const txHash of matchTxHashes) {
-    // eslint-disable-next-line no-await-in-loop
-    const verified = await isSatisfiedTransactionOnDex(chain, txHash, dexAddresses, addLiquidityTopics)
-    if (verified) {
-      console.log('All time: ', Date.now() - time)
-      return true
-    }
+  // Verify add liquidity transaction
+  try {
+    const latestBlockNumber = Number(await callInfuraApi(chain, INFURA_METHOD.GET_BLOCK_NUMBER))
+    console.log(latestBlockNumber)
+    await Promise.any(matchTxHashes.map((txHash) => isSatisfiedTransactionOnDex(chain, txHash, dexAddresses, addLiquidityTopics, latestBlockNumber)))
+    return true
+  } catch (err) {
+    console.log('Error: ', err.message)
+    console.log(err.errors)
+    return false
   }
-  console.log('All time: ', Date.now() - time)
-  return false
 }
