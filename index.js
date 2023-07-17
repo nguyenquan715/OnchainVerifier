@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { CURRENCY_INFO, CURRENCY_DECIMAL, CHAIN } from '@root/helpers/constants'
+import { CURRENCY_INFO, CURRENCY_DECIMAL, CHAIN, DEX_NAME } from '@root/helpers/constants'
 import { createServer } from 'http'
 import express from 'express'
 import {
@@ -15,6 +15,25 @@ server.listen(port, () => {
   console.log(`Listening dapp: http://${host}:${port}`)
 })
 
+app.get('/api/chain/:chain/dex/:dex/swap', async (req, res) => {
+  const { chain, dex } = req.params
+  const { wallet, from, to, amount } = req.query
+  switch (String(dex).toUpperCase()) {
+    case DEX_NAME.UNI_SWAP:
+      const verified = await verifySwapTransactionOnUniswap(
+        String(chain).toUpperCase(),
+        wallet,
+        from,
+        to,
+        String(amount)
+      )
+      return res.status(200).send({ verified })
+    default:
+      return res.status(400).send({ message: 'Invalid dex' })
+  }
+})
+
+/*
 const main = async () => {
   const isSwap = await verifySwapTransactionOnUniswap(
     CHAIN.ETHEREUM,
@@ -35,3 +54,4 @@ const main = async () => {
 }
 
 main()
+*/
