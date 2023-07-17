@@ -23,8 +23,8 @@ app.get('/api/chain/:chain/dex/:dex/swap', async (req, res) => {
       const verified = await verifySwapTransactionOnUniswap(
         String(chain).toUpperCase(),
         wallet,
-        from,
-        to,
+        String(from).toLowerCase(),
+        String(to).toLowerCase,
         String(amount)
       )
       return res.status(200).send({ verified })

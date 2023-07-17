@@ -107,11 +107,11 @@ export const CURRENCY_INFO = Object.freeze({
 
 export const CURRENCY_DECIMAL = Object.freeze({
   [CHAIN.POLYGON]: Object.values(CURRENCY_INFO.POLYGON).reduce((obj, { address, decimal }) => {
-    obj[address] = decimal
+    obj[address.toLowerCase()] = decimal
     return obj
   }, {}),
   [CHAIN.ETHEREUM]: Object.values(CURRENCY_INFO.ETHEREUM).reduce((obj, { address, decimal }) => {
-    obj[address] = decimal
+    obj[address.toLowerCase()] = decimal
     return obj
   }, {}),
 })
